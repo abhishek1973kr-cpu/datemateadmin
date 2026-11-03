@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email.matches('.*@datemate[.]in$') ||
+        request.auth.token.email in ['admin@datemate.in', 'superadmin@datemate.in', 'operations@datemate.in']
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users collection
+    // Clients can read and write their own record; Admins have full access
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Partners collection (KYC & registration details)
+    // Confidential: never expose Aadhaar to public
+    match /partners/{partnerId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // 3. Companions collection (Public directory)
+    // Public can view approved & active companions; Only Admin can write or update
+    match /companions/{companionId} {
+      allow read: if resource.data.isActive == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 4. Bookings collection
+    // Client and Companion can view their bookings; Admin has full audit access
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == resource.data.clientId ||
+        request.auth.uid == resource.data.companionId ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.clientId);
+      allow delete: if isAdmin();
+    }
+
+    // 5. Locations collection
+    // Public can read availability; Admin can update availability switches
+    match /locations/{locationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 6. Pricing collection
+    // Public can read rates; Only Admin can modify pricing configuration
+    match /pricing/{pricingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 7. Payments collection
+    // Only Admin can read full ledger; Clients can read their own transactions
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // 8. Admin logs & notifications
+    match /admin_logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
