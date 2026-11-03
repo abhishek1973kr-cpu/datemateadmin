@@ -244,3 +244,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAdminAuth() {
   return useContext(AuthContext);
 }
+

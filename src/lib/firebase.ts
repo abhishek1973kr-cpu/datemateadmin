@@ -397,3 +397,4 @@ export function subscribeToNotifications(onUpdate: (notifs: AdminNotification[])
     return null;
   }
 }
+

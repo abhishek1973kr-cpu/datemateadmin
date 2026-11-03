@@ -1298,3 +1298,4 @@ export function computeAdminStats() {
     totalPlatformRevenue: totalRegistrationRevenue + platformCommission
   };
 }
+

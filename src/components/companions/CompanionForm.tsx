@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Companion, Gender } from "@/lib/types";
 import {
   ImageUploadDropzone,
-  UploadedPhoto
+  UploadedPhotoItem
 } from "./ImageUploadDropzone";
 import { syncSaveCompanion } from "@/lib/admin-store";
 import {
@@ -80,12 +80,24 @@ export function CompanionForm({
   const [isAvailable, setIsAvailable] = useState<boolean>(initialCompanion?.isAvailable ?? true);
   const [isActive, setIsActive] = useState<boolean>(initialCompanion?.isActive ?? true);
 
-  // Photos State (converted to UploadedPhoto array)
-  const initialPhotos: UploadedPhoto[] = (initialCompanion?.photos || []).map((url, i) => ({
+  // Photos State (converted to UploadedPhotoItem array)
+  const initialPhotos: UploadedPhotoItem[] = (initialCompanion?.images || (initialCompanion?.photos || []).map((url, i) => ({
     url,
-    publicId: initialCompanion?.photoPublicIds?.[i] || undefined,
+    secure_url: url,
+    public_id: initialCompanion?.photoPublicIds?.[i] || `photo-${i}`,
+    position: i,
+    uploadedAt: new Date().toISOString()
+  }))).map((it, i) => ({
+    url: it.url || (it as any).secure_url,
+    secure_url: (it as any).secure_url || it.url,
+    public_id: (it as any).public_id || (it as any).publicId || `photo-${i}`,
+    position: (it as any).position ?? i,
+    uploadedAt: (it as any).uploadedAt || new Date().toISOString(),
+    width: (it as any).width,
+    height: (it as any).height,
+    format: (it as any).format
   }));
-  const [photos, setPhotos] = useState<UploadedPhoto[]>(initialPhotos);
+  const [photos, setPhotos] = useState<UploadedPhotoItem[]>(initialPhotos);
 
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -143,8 +155,19 @@ export function CompanionForm({
         price30Min: Number(price30Min),
         rating: initialCompanion?.rating || 5.0,
         reviewCount: initialCompanion?.reviewCount || 0,
-        photos: photos.map((p) => p.url),
-        photoPublicIds: photos.map((p) => p.publicId || ""),
+        photos: photos.map((p) => p.secure_url || p.url),
+        photoPublicIds: photos.map((p) => p.public_id),
+        images: photos.map((p, idx) => ({
+          url: p.secure_url || p.url,
+          secure_url: p.secure_url || p.url,
+          public_id: p.public_id,
+          position: idx,
+          uploadedAt: p.uploadedAt || new Date().toISOString(),
+          width: p.width,
+          height: p.height,
+          format: p.format,
+          isPrimary: idx === 0,
+        })),
         languages: languages.split(",").map((s) => s.trim()).filter(Boolean),
         interests: interests.split(",").map((s) => s.trim()).filter(Boolean),
         services: services.split(",").map((s) => s.trim()).filter(Boolean),
@@ -517,3 +540,4 @@ export function CompanionForm({
     </form>
   );
 }
+

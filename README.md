@@ -113,3 +113,4 @@ npm start
 6. **TEST 6: Admin updates booking pricing** → Rates updated in `pricing/datemate_pricing_config`, User Panel booking modal reads new rates.
 7. **TEST 7: Admin disables a companion** → `isActive` set to `false`, profile disappears from User Panel discovery without breaking existing bookings.
 8. **TEST 8: Unauthorized user access** → Restricted route guard and non-admin email blocking deny access to public users.
+

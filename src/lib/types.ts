@@ -121,7 +121,13 @@ export interface PartnerApplication {
 
 export interface CompanionImage {
   url: string;
-  publicId?: string;
+  secure_url: string;
+  public_id: string;
+  position: number;
+  uploadedAt: string;
+  width?: number;
+  height?: number;
+  format?: string;
   isPrimary?: boolean;
 }
 
@@ -331,3 +337,4 @@ export interface AdminNotification {
   link?: string;
   createdAt: string;
 }
+

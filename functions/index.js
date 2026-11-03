@@ -110,3 +110,4 @@ exports.onBookingCreated = functions.firestore
       createdAt: new Date().toISOString()
     });
   });
+

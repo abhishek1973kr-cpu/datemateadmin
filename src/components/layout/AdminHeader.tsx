@@ -56,3 +56,4 @@ export function AdminHeader({ title, subtitle, actions }: AdminHeaderProps) {
     </header>
   );
 }
+
