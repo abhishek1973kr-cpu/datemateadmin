@@ -34,7 +34,8 @@ import {
   ServiceState,
   PricingConfig,
   AdminLog,
-  AdminNotification
+  AdminNotification,
+  isFakeOrDemoPayment
 } from "./types";
 
 const firebaseConfig = {
@@ -293,6 +294,7 @@ export async function firestoreUpdateBooking(bookingId: string, updates: Partial
 
 /**
  * Real-time listener for Payments
+ * Strictly filters out any demo/fake entries so only genuine transactions are received
  */
 export function subscribeToPayments(onUpdate: (payments: PaymentTransaction[]) => void): Unsubscribe | null {
   if (!db || !isFirebaseConfigured) return null;
@@ -301,8 +303,14 @@ export function subscribeToPayments(onUpdate: (payments: PaymentTransaction[]) =
     return onSnapshot(q, (snapshot) => {
       const list: PaymentTransaction[] = [];
       snapshot.forEach((doc) => {
-        list.push({ ...doc.data(), id: doc.id } as PaymentTransaction);
+        const item = { ...doc.data(), id: doc.id } as PaymentTransaction;
+        // Never allow demo or fake transactions to enter the Admin Panel
+        if (!isFakeOrDemoPayment(item)) {
+          list.push(item);
+        }
       });
+      // Sort newest first
+      list.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
       onUpdate(list);
     }, (err) => {
       console.warn("Firestore subscribeToPayments error:", err);
@@ -314,10 +322,15 @@ export function subscribeToPayments(onUpdate: (payments: PaymentTransaction[]) =
 }
 
 /**
- * Save Payment transaction
+ * Save Payment transaction (Only genuine verified transactions allowed)
  */
 export async function firestoreSavePayment(payment: PaymentTransaction): Promise<void> {
   if (!db || !isFirebaseConfigured) return;
+  // Strict prevention of saving fake/demo data to Firestore
+  if (isFakeOrDemoPayment(payment)) {
+    console.warn("Rejected attempt to write demo payment to Firestore:", payment.id);
+    return;
+  }
   try {
     const ref = doc(db, "payments", payment.id);
     const cleanPayment = sanitizeFirestoreData(payment);

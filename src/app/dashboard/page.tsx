@@ -16,7 +16,8 @@ import {
   subscribeToBookings,
   subscribeToPartners,
   subscribeToUsers,
-  subscribeToCompanions
+  subscribeToCompanions,
+  subscribeToPayments
 } from "@/lib/firebase";
 import {
   Users,
@@ -53,12 +54,14 @@ export default function DashboardPage() {
       const unsubB = subscribeToBookings(() => refreshData());
       const unsubU = subscribeToUsers(() => refreshData());
       const unsubC = subscribeToCompanions(() => refreshData());
+      const unsubPay = subscribeToPayments(() => refreshData());
 
       return () => {
         if (unsubP) unsubP();
         if (unsubB) unsubB();
         if (unsubU) unsubU();
         if (unsubC) unsubC();
+        if (unsubPay) unsubPay();
       };
     }
   }, []);

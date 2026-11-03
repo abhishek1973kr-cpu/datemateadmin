@@ -11,7 +11,8 @@ import {
   INITIAL_SERVICE_STATES,
   INITIAL_PRICING_CONFIG,
   AdminLog,
-  AdminNotification
+  AdminNotification,
+  isFakeOrDemoPayment
 } from "./types";
 import {
   isFirebaseConfigured,
@@ -39,7 +40,7 @@ const ADMIN_COMPANIONS_KEY = "datemate_admin_companions_v1";
 const ADMIN_PARTNERS_KEY = "datemate_admin_partners_v1";
 const ADMIN_USERS_KEY = "datemate_admin_users_v1";
 const ADMIN_BOOKINGS_KEY = "datemate_admin_bookings_v1";
-const ADMIN_PAYMENTS_KEY = "datemate_admin_payments_v1";
+const ADMIN_PAYMENTS_KEY = "datemate_admin_payments_v2_authentic";
 const ADMIN_LOCATIONS_KEY = "datemate_admin_locations_v1";
 const ADMIN_PRICING_KEY = "datemate_admin_pricing_v1";
 const ADMIN_LOGS_KEY = "datemate_admin_logs_v1";
@@ -62,10 +63,8 @@ export const SEED_USERS: User[] = [
     isAgeVerified: true,
     authProvider: "google",
     googleVerified: true,
-    hasPaidRegistrationFee: true,
-    registrationTransactionId: "pay_rzp_usr_99_demo",
-    registrationFeeAmount: 99,
-    registrationFeePaidAt: "2026-02-01T10:05:00Z",
+    hasPaidRegistrationFee: false,
+    registrationFeeAmount: 0,
     status: "active",
     avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
     createdAt: "2026-02-01T10:00:00Z"
@@ -82,10 +81,8 @@ export const SEED_USERS: User[] = [
     state: "West Bengal",
     isAgeVerified: true,
     authProvider: "credentials",
-    hasPaidRegistrationFee: true,
-    registrationTransactionId: "pay_rzp_usr_99_kol1",
-    registrationFeeAmount: 99,
-    registrationFeePaidAt: "2026-02-10T14:20:00Z",
+    hasPaidRegistrationFee: false,
+    registrationFeeAmount: 0,
     status: "active",
     avatarUrl: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=200&q=80",
     createdAt: "2026-02-10T14:00:00Z"
@@ -130,10 +127,8 @@ export const SEED_PARTNERS: PartnerApplication[] = [
     maskedAadhaar: "XXXX-XXXX-1920",
     aadhaarDocumentUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
     aadhaarConsent: true,
-    feeAmount: 199,
-    feePaid: true,
-    feeTransactionId: "pay_rzp_ptr_10024",
-    feePaidAt: "2026-01-15T10:05:00Z",
+    feeAmount: 0,
+    feePaid: false,
     status: "approved",
     submittedAt: "2026-01-15T10:00:00Z",
     approvedAt: "2026-01-15T12:00:00Z",
@@ -167,10 +162,8 @@ export const SEED_PARTNERS: PartnerApplication[] = [
     maskedAadhaar: "XXXX-XXXX-8901",
     aadhaarDocumentUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
     aadhaarConsent: true,
-    feeAmount: 199,
-    feePaid: true,
-    feeTransactionId: "pay_rzp_ptr_10492",
-    feePaidAt: "2026-11-02T18:30:00Z",
+    feeAmount: 0,
+    feePaid: false,
     status: "pending",
     submittedAt: "2026-11-02T18:25:00Z",
     headline: "Literature graduate & warm cafe conversationalist",
@@ -202,10 +195,8 @@ export const SEED_PARTNERS: PartnerApplication[] = [
     maskedAadhaar: "XXXX-XXXX-9012",
     aadhaarDocumentUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80",
     aadhaarConsent: true,
-    feeAmount: 199,
-    feePaid: true,
-    feeTransactionId: "pay_rzp_ptr_10815",
-    feePaidAt: "2026-11-03T09:15:00Z",
+    feeAmount: 0,
+    feePaid: false,
     status: "pending",
     submittedAt: "2026-11-03T09:00:00Z",
     headline: "Classical musician & heritage walker in City of Joy",
@@ -420,9 +411,8 @@ export const SEED_BOOKINGS: Booking[] = [
     platformFee: 450,
     tax: 225,
     totalAmount: 5175,
-    status: "confirmed",
-    paymentStatus: "paid",
-    paymentId: "pay_rzp_demo_101",
+    status: "pending",
+    paymentStatus: "pending",
     specialNotes: "Looking forward to great continental food and music conversation.",
     createdAt: "2026-11-01T14:30:00Z"
   },
@@ -470,123 +460,19 @@ export const SEED_BOOKINGS: Booking[] = [
     tax: 140,
     totalAmount: 3220,
     status: "completed",
-    paymentStatus: "paid",
-    paymentId: "pay_rzp_demo_103",
+    paymentStatus: "pending",
     createdAt: "2026-10-30T10:00:00Z"
   }
 ];
 
-export const SEED_PAYMENTS: PaymentTransaction[] = [
-  {
-    id: "pay_rzp_usr_99_demo",
-    type: "user_registration",
-    referenceId: "user-client-1",
-    customerName: "Karan Singhal",
-    customerEmail: "karan.singhal@example.com",
-    customerPhone: "+91 98111 22334",
-    amount: 99,
-    currency: "INR",
-    purpose: "DateMate User Registration Fee (₹99 Escrow & ID Protection)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_usr_99_demo",
-    status: "paid",
-    date: "2026-02-01T10:05:00Z"
-  },
-  {
-    id: "pay_rzp_usr_99_kol1",
-    type: "user_registration",
-    referenceId: "user-client-2",
-    customerName: "Vikramaditya Roy",
-    customerEmail: "vikram.roy@example.com",
-    customerPhone: "+91 98300 11223",
-    amount: 99,
-    currency: "INR",
-    purpose: "DateMate User Registration Fee (₹99 Escrow & ID Protection)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_usr_99_kol1",
-    status: "paid",
-    date: "2026-02-10T14:20:00Z"
-  },
-  {
-    id: "pay_rzp_ptr_10024",
-    type: "partner_registration",
-    referenceId: "DM-PTR-10024",
-    customerName: "Aanya Sharma",
-    customerEmail: "aanya.sharma@example.com",
-    customerPhone: "+91 98222 33445",
-    amount: 199,
-    currency: "INR",
-    purpose: "DateMate Partner Verification Fee (₹199 KYC & Security Check)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_ptr_10024",
-    status: "paid",
-    date: "2026-01-15T10:05:00Z"
-  },
-  {
-    id: "pay_rzp_ptr_10492",
-    type: "partner_registration",
-    referenceId: "DM-PTR-10492",
-    customerName: "Neha Chaurasia",
-    customerEmail: "neha.patna@example.com",
-    customerPhone: "+91 98350 49122",
-    amount: 199,
-    currency: "INR",
-    purpose: "DateMate Partner Verification Fee (₹199 KYC & Security Check)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_ptr_10492",
-    status: "paid",
-    date: "2026-11-02T18:30:00Z"
-  },
-  {
-    id: "pay_rzp_ptr_10815",
-    type: "partner_registration",
-    referenceId: "DM-PTR-10815",
-    customerName: "Priyanka Sen",
-    customerEmail: "priyanka.sen@example.com",
-    customerPhone: "+91 98310 77441",
-    amount: 199,
-    currency: "INR",
-    purpose: "DateMate Partner Verification Fee (₹199 KYC & Security Check)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_ptr_10815",
-    status: "paid",
-    date: "2026-11-03T09:15:00Z"
-  },
-  {
-    id: "pay_rzp_demo_101",
-    type: "booking",
-    referenceId: "bk-1001",
-    customerName: "Karan Singhal",
-    customerEmail: "karan.singhal@example.com",
-    amount: 5175,
-    currency: "INR",
-    purpose: "Companionship Booking with Aanya Sharma (3 hrs)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_demo_101",
-    status: "paid",
-    date: "2026-11-01T14:35:00Z"
-  },
-  {
-    id: "pay_rzp_demo_103",
-    type: "booking",
-    referenceId: "bk-1003",
-    customerName: "Vikramaditya Roy",
-    customerEmail: "vikram.roy@example.com",
-    amount: 3220,
-    currency: "INR",
-    purpose: "Companionship Booking with Sourav Ganguly (2 hrs)",
-    gateway: "Razorpay",
-    gatewayTransactionId: "pay_rzp_demo_103",
-    status: "paid",
-    date: "2026-10-30T10:05:00Z"
-  }
-];
+// STRICT RULE: No fake payments, demo transactions, or dummy revenue
+export const SEED_PAYMENTS: PaymentTransaction[] = [];
 
 export const SEED_NOTIFICATIONS: AdminNotification[] = [
   {
     id: "notif-1",
     title: "New Partner Application",
-    message: "Priyanka Sen submitted a partner application in Kolkata with ₹199 verification fee paid.",
+    message: "Priyanka Sen submitted a partner application in Kolkata.",
     type: "partner",
     isRead: false,
     link: "/dashboard/partners",
@@ -594,21 +480,12 @@ export const SEED_NOTIFICATIONS: AdminNotification[] = [
   },
   {
     id: "notif-2",
-    title: "New Booking Confirmed",
-    message: "Booking #bk-1001 confirmed for Aanya Sharma in Mumbai (₹5,175 paid).",
+    title: "New Booking Created",
+    message: "Booking #bk-1001 created for Aanya Sharma in Mumbai.",
     type: "booking",
     isRead: false,
     link: "/dashboard/bookings",
     createdAt: "2026-11-01T14:35:00Z"
-  },
-  {
-    id: "notif-3",
-    title: "User Fee Received",
-    message: "Karan Singhal verified account with ₹99 registration fee.",
-    type: "payment",
-    isRead: true,
-    link: "/dashboard/payments",
-    createdAt: "2026-02-01T10:05:00Z"
   }
 ];
 
@@ -715,22 +592,36 @@ export function saveAdminBookings(bookings: Booking[]) {
 }
 
 export function getStoredAdminPayments(): PaymentTransaction[] {
-  if (typeof window === "undefined") return SEED_PAYMENTS;
+  if (typeof window === "undefined") return [];
   try {
+    // Purge legacy demo payment storage if present
+    if (localStorage.getItem("datemate_admin_payments_v1")) {
+      localStorage.removeItem("datemate_admin_payments_v1");
+    }
+
     const raw = localStorage.getItem(ADMIN_PAYMENTS_KEY);
     if (!raw) {
-      localStorage.setItem(ADMIN_PAYMENTS_KEY, JSON.stringify(SEED_PAYMENTS));
-      return SEED_PAYMENTS;
+      return [];
     }
-    return JSON.parse(raw);
+    const parsed: PaymentTransaction[] = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // Filter out demo/test entries safely; preserve genuine customer payments
+    const authentic = parsed.filter(p => !isFakeOrDemoPayment(p));
+    if (authentic.length !== parsed.length) {
+      localStorage.setItem(ADMIN_PAYMENTS_KEY, JSON.stringify(authentic));
+    }
+    return authentic;
   } catch {
-    return SEED_PAYMENTS;
+    return [];
   }
 }
 
 export function saveAdminPayments(payments: PaymentTransaction[]) {
   if (typeof window !== "undefined") {
-    localStorage.setItem(ADMIN_PAYMENTS_KEY, JSON.stringify(payments));
+    // Only save authentic verified transactions
+    const authentic = payments.filter(p => !isFakeOrDemoPayment(p));
+    localStorage.setItem(ADMIN_PAYMENTS_KEY, JSON.stringify(authentic));
   }
 }
 
@@ -1255,27 +1146,31 @@ export function computeAdminStats() {
   const completedBookings = bookings.filter(b => b.status === "completed").length;
   const cancelledBookings = bookings.filter(b => b.status === "cancelled" || b.status === "rejected").length;
 
-  // Revenues
-  // ₹99 user registration fee + ₹199 partner registration fee
-  const userRegRevenue = payments
-    .filter(p => p.type === "user_registration" && p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Revenues - Strictly authentic verified transactions (Never fabricated)
+  const authenticPayments = payments.filter(p => !isFakeOrDemoPayment(p));
+  const isPaid = (status?: string) => status === "paid" || status === "success" || status === "captured";
 
-  const partnerRegRevenue = payments
-    .filter(p => p.type === "partner_registration" && p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  // ₹99 user registration fee + ₹199 partner registration fee
+  const userRegRevenue = authenticPayments
+    .filter(p => p.type === "user_registration" && isPaid(p.status))
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const partnerRegRevenue = authenticPayments
+    .filter(p => p.type === "partner_registration" && isPaid(p.status))
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   const totalRegistrationRevenue = userRegRevenue + partnerRegRevenue;
 
-  // Booking revenue
-  const totalBookingRevenue = payments
-    .filter(p => p.type === "booking" && p.status === "paid")
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Booking gross revenue from genuine captured payments
+  const totalBookingRevenue = authenticPayments
+    .filter(p => p.type === "booking" && isPaid(p.status))
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
-  // Platform commission (10% of subtotal from completed or paid bookings)
-  const platformCommission = bookings
-    .filter(b => b.paymentStatus === "paid")
-    .reduce((sum, b) => sum + (b.platformFee || Math.round(b.subtotal * 0.1)), 0);
+  // Platform commission (10% strictly from verified captured booking transactions)
+  // Demo or pending bookings NEVER contribute to platform commission
+  const platformCommission = authenticPayments
+    .filter(p => p.type === "booking" && isPaid(p.status))
+    .reduce((sum, p) => sum + Math.round((Number(p.amount) || 0) * 0.1), 0);
 
   return {
     totalUsers,

@@ -304,7 +304,45 @@ export interface PaymentTransaction {
   status: 'paid' | 'pending' | 'refunded' | 'failed';
   refundAmount?: number;
   refundReason?: string;
+  isVerified?: boolean;
+  verifiedAt?: string;
+  isDemo?: boolean;
   date: string;
+}
+
+/**
+ * Identifies demo, test, or fabricated payment transactions.
+ * Strict rules prevent any fake transaction from appearing in the Payment Panel or counting towards revenue.
+ * Preserves all genuine customer payments.
+ */
+export function isFakeOrDemoPayment(p: any): boolean {
+  if (!p) return true;
+  const id = String(p.id || "").toLowerCase();
+  const txnId = String(p.gatewayTransactionId || "").toLowerCase();
+  const refId = String(p.referenceId || "").toLowerCase();
+
+  // Explicit demo/test flags
+  if (p.isDemo === true || p.demo === true || p.isTest === true) return true;
+
+  // Demo identifiers in IDs
+  if (id.includes("demo") || txnId.includes("demo") || refId.includes("demo")) return true;
+  if (id.includes("test_") || txnId.includes("test_")) return true;
+
+  // Known hardcoded seed IDs from initial mockup
+  const knownFakeIds = [
+    "pay_rzp_usr_99_demo",
+    "pay_rzp_usr_99_kol1",
+    "pay_rzp_ptr_10024",
+    "pay_rzp_ptr_10492",
+    "pay_rzp_ptr_10815",
+    "pay_rzp_demo_101",
+    "pay_rzp_demo_103"
+  ];
+  if (knownFakeIds.includes(p.id) || knownFakeIds.includes(p.gatewayTransactionId)) {
+    return true;
+  }
+
+  return false;
 }
 
 export interface Review {
