@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Companion, Gender } from "@/lib/types";
+import { Companion, Gender, PartnerApplication } from "@/lib/types";
 import {
   ImageUploadDropzone,
   UploadedPhotoItem
 } from "./ImageUploadDropzone";
-import { syncSaveCompanion } from "@/lib/admin-store";
+import { syncSaveCompanion, getStoredAdminPartners } from "@/lib/admin-store";
 import {
   User,
   MapPin,
@@ -18,7 +18,11 @@ import {
   Check,
   AlertCircle,
   Save,
-  ArrowLeft
+  ArrowLeft,
+  UserCheck,
+  Link as LinkIcon,
+  CheckCircle2,
+  RefreshCw
 } from "lucide-react";
 
 const INDIAN_STATES_CITIES: Record<string, string[]> = {
@@ -53,6 +57,10 @@ export function CompanionForm({
 
   // Form State
   const companionId = initialCompanion?.id || `comp-${Date.now().toString().slice(-6)}`;
+
+  // Partner Association
+  const [partnerId, setPartnerId] = useState<string>(initialCompanion?.partnerId || "");
+  const [partnersList, setPartnersList] = useState<PartnerApplication[]>([]);
 
   const [fullName, setFullName] = useState(initialCompanion?.fullName || "");
   const [age, setAge] = useState<number>(initialCompanion?.age || 23);
@@ -102,6 +110,16 @@ export function CompanionForm({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Load existing partners list on mount
+  useEffect(() => {
+    try {
+      const storedPartners = getStoredAdminPartners();
+      setPartnersList(storedPartners);
+    } catch (e) {
+      console.warn("Could not load partners list:", e);
+    }
+  }, []);
+
   const handleStateChange = (newState: string) => {
     setState(newState);
     const citiesForState = INDIAN_STATES_CITIES[newState] || [newState];
@@ -111,6 +129,48 @@ export function CompanionForm({
   const handleHourlyPriceChange = (val: number) => {
     setHourlyPrice(val);
     setPrice30Min(Math.round(val * 0.6));
+  };
+
+  const handlePartnerSelect = (selectedId: string) => {
+    setPartnerId(selectedId);
+    if (selectedId) {
+      const selected = partnersList.find((p) => p.id === selectedId);
+      if (selected) {
+        if (!fullName || fullName === "e.g. Aanya Sharma") setFullName(selected.fullLegalName);
+        if (selected.mobile) setMobile(selected.mobile);
+        if (selected.email) setEmail(selected.email);
+        if (selected.city) {
+          setCity(selected.city);
+          if (selected.state) setState(selected.state);
+        }
+        if (selected.residentialAddress) setFullAddress(selected.residentialAddress);
+        if (selected.bio) setBio(selected.bio);
+        if (selected.headline) setHeadline(selected.headline);
+        if (selected.hourlyPrice) {
+          setHourlyPrice(selected.hourlyPrice);
+          setPrice30Min(selected.price30Min || Math.round(selected.hourlyPrice * 0.6));
+        }
+        if (selected.languages && selected.languages.length > 0) {
+          setLanguages(selected.languages.join(", "));
+        }
+        if (selected.interests && selected.interests.length > 0) {
+          setInterests(selected.interests.join(", "));
+        }
+        if (selected.gender) setGender(selected.gender);
+
+        // Pre-fill photos from partner application if companion has no photos yet
+        if (photos.length === 0 && selected.photos && selected.photos.length > 0) {
+          const importedPhotos: UploadedPhotoItem[] = selected.photos.map((pUrl, idx) => ({
+            url: pUrl,
+            secure_url: pUrl,
+            public_id: selected.photoPublicIds?.[idx] || `datemate/companions/${companionId}/imported_${idx}`,
+            position: idx,
+            uploadedAt: new Date().toISOString()
+          }));
+          setPhotos(importedPhotos);
+        }
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,17 +198,19 @@ export function CompanionForm({
     setSaving(true);
 
     try {
+      // Build safe companion document - NEVER pass partnerId: undefined!
       const companionRecord: Companion = {
         id: companionId,
-        partnerId: initialCompanion?.partnerId,
+        // Only include partnerId if a valid partner was selected/linked
+        ...(partnerId && partnerId.trim() ? { partnerId: partnerId.trim() } : {}),
         fullName: fullName.trim(),
         age: Number(age),
         gender,
-        mobile: mobile.trim(),
-        email: email.trim(),
+        ...(mobile.trim() ? { mobile: mobile.trim() } : {}),
+        ...(email.trim() ? { email: email.trim() } : {}),
         state: state.trim(),
         city: city.trim(),
-        fullAddress: fullAddress.trim(),
+        ...(fullAddress.trim() ? { fullAddress: fullAddress.trim() } : {}),
         headline: headline.trim(),
         bio: bio.trim(),
         hourlyPrice: Number(hourlyPrice),
@@ -156,16 +218,16 @@ export function CompanionForm({
         rating: initialCompanion?.rating || 5.0,
         reviewCount: initialCompanion?.reviewCount || 0,
         photos: photos.map((p) => p.secure_url || p.url),
-        photoPublicIds: photos.map((p) => p.public_id),
+        photoPublicIds: photos.map((p) => p.public_id).filter(Boolean),
         images: photos.map((p, idx) => ({
           url: p.secure_url || p.url,
           secure_url: p.secure_url || p.url,
-          public_id: p.public_id,
+          public_id: p.public_id || `img_${idx}`,
           position: idx,
           uploadedAt: p.uploadedAt || new Date().toISOString(),
-          width: p.width,
-          height: p.height,
-          format: p.format,
+          width: p.width || 800,
+          height: p.height || 1000,
+          format: p.format || "jpg",
           isPrimary: idx === 0,
         })),
         languages: languages.split(",").map((s) => s.trim()).filter(Boolean),
@@ -183,6 +245,7 @@ export function CompanionForm({
       // Redirect to companions directory or state-wise hub
       router.push("/dashboard/companions");
     } catch (err: any) {
+      console.error("Save companion error:", err);
       setFormError(err.message || "Failed to save companion profile");
     } finally {
       setSaving(false);
@@ -220,14 +283,66 @@ export function CompanionForm({
         />
       </div>
 
-      {/* SECTION 2: PERSONAL INFORMATION */}
+      {/* SECTION 2: PERSONAL INFORMATION & PARTNER LINKING */}
       <div className="admin-card space-y-6">
         <div>
           <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
             2. Personal Information & Location
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Essential identity and territorial assignment details
+            Essential identity, optional partner application link, and territorial assignment
+          </p>
+        </div>
+
+        {/* PARTNER ASSOCIATION SELECTOR */}
+        <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200/90 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-purple-600" />
+              <label className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                Link Existing Partner Application (Optional)
+              </label>
+            </div>
+            {partnerId ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>Linked: {partnerId}</span>
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                Direct Onboarding (No Partner Linked)
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select
+              value={partnerId}
+              onChange={(e) => handlePartnerSelect(e.target.value)}
+              className="flex-1 px-3.5 py-2.5 bg-white border border-purple-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600"
+            >
+              <option value="">-- Direct DateMate Companion (No Associated Partner) --</option>
+              {partnersList.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id} – {p.fullLegalName} ({p.city}, {p.state}) [{p.status.toUpperCase()}]
+                </option>
+              ))}
+            </select>
+
+            {partnerId && (
+              <button
+                type="button"
+                onClick={() => handlePartnerSelect(partnerId)}
+                className="px-3 py-2 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                title="Re-populate form with partner details"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-purple-600" />
+                <span>Auto-Fill Details</span>
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            If selected, companion profile is mapped to this verified partner record and stores the partner document ID in Firestore. If none selected, the companion is treated as an independent DateMate companion without creating an invalid field.
           </p>
         </div>
 
@@ -540,4 +655,3 @@ export function CompanionForm({
     </form>
   );
 }
-

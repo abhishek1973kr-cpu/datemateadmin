@@ -921,7 +921,7 @@ export async function syncApprovePartner(appId: string): Promise<Companion | nul
 
   const companionProfile: Companion = {
     id: companionId,
-    userId: partner.userId,
+    ...(partner.userId ? { userId: partner.userId } : {}),
     partnerId: partner.id,
     fullName: partner.fullLegalName,
     gender: partner.gender,

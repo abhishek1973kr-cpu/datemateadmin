@@ -73,6 +73,37 @@ if (typeof window !== "undefined" || isFirebaseConfigured) {
 export { app, auth, db, storage };
 
 // ============================================================================
+// SAFE FIRESTORE DATA SANITIZER
+// ============================================================================
+
+/**
+ * Recursively removes undefined fields from an object before writing to Firestore.
+ * Preserves null, dates, primitives, arrays, and nested structures.
+ * Never allows `undefined` to reach Firestore setDoc / updateDoc.
+ */
+export function sanitizeFirestoreData<T extends Record<string, any>>(data: T): Record<string, any> {
+  if (data === null || typeof data !== "object") {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => (typeof item === "object" && item !== null ? sanitizeFirestoreData(item) : item));
+  }
+  const clean: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (val !== undefined) {
+      if (val !== null && typeof val === "object" && !(val instanceof Date)) {
+        clean[key] = sanitizeFirestoreData(val);
+      } else {
+        clean[key] = val;
+      }
+    }
+  }
+  return clean;
+}
+
+// ============================================================================
 // REAL-TIME FIRESTORE REPOSITORY LISTENERS & HELPERS
 // ============================================================================
 
@@ -100,15 +131,26 @@ export function subscribeToCompanions(onUpdate: (companions: Companion[]) => voi
 
 /**
  * Save or update companion in Firestore (instantly visible in User Panel)
+ * Strictly sanitizes data to eliminate any undefined fields (e.g. optional partnerId)
  */
 export async function firestoreSaveCompanion(companion: Companion): Promise<void> {
   if (!db || !isFirebaseConfigured) return;
+
+  // Validate critical required fields
+  if (!companion.id) {
+    throw new Error("Cannot save companion without a valid document ID.");
+  }
+  if (!companion.fullName || !companion.fullName.trim()) {
+    throw new Error("Cannot save companion without a full name.");
+  }
+
   try {
     const ref = doc(db, "companions", companion.id);
-    await setDoc(ref, {
+    const cleanPayload = sanitizeFirestoreData({
       ...companion,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
+    await setDoc(ref, cleanPayload, { merge: true });
   } catch (err) {
     console.error("firestoreSaveCompanion error:", err);
     throw err;
@@ -158,10 +200,11 @@ export async function firestoreUpdatePartner(partnerId: string, updates: Partial
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "partners", partnerId);
-    await updateDoc(ref, {
+    const cleanUpdates = sanitizeFirestoreData({
       ...updates,
       updatedAt: new Date().toISOString()
     });
+    await updateDoc(ref, cleanUpdates);
   } catch (err) {
     console.error("firestoreUpdatePartner error:", err);
     throw err;
@@ -197,10 +240,11 @@ export async function firestoreUpdateUser(userId: string, updates: Partial<User>
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "users", userId);
-    await updateDoc(ref, {
+    const cleanUpdates = sanitizeFirestoreData({
       ...updates,
       updatedAt: new Date().toISOString()
     });
+    await updateDoc(ref, cleanUpdates);
   } catch (err) {
     console.error("firestoreUpdateUser error:", err);
     throw err;
@@ -236,10 +280,11 @@ export async function firestoreUpdateBooking(bookingId: string, updates: Partial
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "bookings", bookingId);
-    await updateDoc(ref, {
+    const cleanUpdates = sanitizeFirestoreData({
       ...updates,
       updatedAt: new Date().toISOString()
     });
+    await updateDoc(ref, cleanUpdates);
   } catch (err) {
     console.error("firestoreUpdateBooking error:", err);
     throw err;
@@ -275,7 +320,8 @@ export async function firestoreSavePayment(payment: PaymentTransaction): Promise
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "payments", payment.id);
-    await setDoc(ref, payment, { merge: true });
+    const cleanPayment = sanitizeFirestoreData(payment);
+    await setDoc(ref, cleanPayment, { merge: true });
   } catch (err) {
     console.error("firestoreSavePayment error:", err);
     throw err;
@@ -311,10 +357,11 @@ export async function firestoreSaveLocation(location: ServiceState): Promise<voi
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "locations", location.id);
-    await setDoc(ref, {
+    const cleanLocation = sanitizeFirestoreData({
       ...location,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
+    await setDoc(ref, cleanLocation, { merge: true });
   } catch (err) {
     console.error("firestoreSaveLocation error:", err);
     throw err;
@@ -348,10 +395,11 @@ export async function firestoreSavePricing(pricing: PricingConfig): Promise<void
   if (!db || !isFirebaseConfigured) return;
   try {
     const ref = doc(db, "pricing", "datemate_pricing_config");
-    await setDoc(ref, {
+    const cleanPricing = sanitizeFirestoreData({
       ...pricing,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
+    await setDoc(ref, cleanPricing, { merge: true });
   } catch (err) {
     console.error("firestoreSavePricing error:", err);
     throw err;
@@ -366,11 +414,12 @@ export async function firestoreLogAdminAction(log: Omit<AdminLog, "id" | "timest
   try {
     const id = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const ref = doc(db, "admin_logs", id);
-    await setDoc(ref, {
+    const cleanLog = sanitizeFirestoreData({
       ...log,
       id,
       timestamp: new Date().toISOString()
     });
+    await setDoc(ref, cleanLog);
   } catch (err) {
     console.warn("firestoreLogAdminAction notice:", err);
   }
@@ -397,4 +446,3 @@ export function subscribeToNotifications(onUpdate: (notifs: AdminNotification[])
     return null;
   }
 }
-
